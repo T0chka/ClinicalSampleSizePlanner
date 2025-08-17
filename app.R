@@ -47,16 +47,51 @@ ui <- page_navbar(
               id = "be_form",
               uiOutput(outputId = "ui_mode_specific"),
               uiOutput(outputId = "ui_design"),
-              uiOutput(outputId = "ui_cv"),
+              
+              div(
+                id = "cv_block",
+                conditionalPanel(
+                  condition = "input.be_mode == 'ni' || input.be_mode == 'ns'",
+                  numericInput(
+                    inputId = "cv_single",
+                    label   = "placeholder",
+                    value   = 0.30, min = 0, max = 1, step = 0.01, width = "100%"
+                  )
+                ),
+                conditionalPanel(
+                  condition = "!(input.be_mode == 'ni' || input.be_mode == 'ns')",
+                  layout_columns(
+                    col_widths = c(6, 6),
+                    numericInput(
+                      inputId = "cv_auc",
+                      label   = "placeholder",
+                      value   = 0.30, min = 0, max = 1, step = 0.01, width = "100%"
+                    ),
+                    numericInput(
+                      inputId = "cv_cmax",
+                      label   = "placeholder",
+                      value   = 0.30, min = 0, max = 1, step = 0.01, width = "100%"
+                    )
+                  )
+                )
+              ),
+              
               uiOutput(outputId = "ui_theta0"),
-
               uiOutput("ui_power"),
               uiOutput("ui_dropout"),
               uiOutput(outputId = "ui_side_dynamic"),
-              actionButton(
-                inputId = "calc_reset_btn",
-                label   = "Calculate",
-                class   = "btn btn-primary w-100"
+              layout_columns(
+                col_widths = c(6, 6),
+                actionButton(
+                  inputId = "calc_btn",
+                  label   = "Calculate",
+                  class   = "btn btn-primary w-100"
+                ),
+                actionButton(
+                  inputId = "reset_btn",
+                  label   = "Reset",
+                  class   = "btn btn-secondary w-100"
+                )
               )
             )
           ),
@@ -243,40 +278,60 @@ server <- function(input, output, session) {
     )
   })
 
-  output$ui_cv <- renderUI({
-    single_cv   <- identical(mode(), "ni") || identical(mode(), "ns")
+  observe({
     is_parallel <- identical(input$design, "parallel")
     is_repl     <- is_replicative(input$design)
+    lab_prefix  <- if (is_parallel) "CVinter" else "CVintra"
+    cmax_prefix <- if (is_repl) "CVwR" else lab_prefix
     
-    label_prefix     <- if (is_parallel) "CVinter" else "CVintra"
-    repl_cmax_prefix <- if (is_repl)     "CVwR"    else label_prefix
-    
-    if (single_cv) {
+    if (mode() %in% c("ni","ns")) {
       endp <- input$endp %||% "AUC"
-      numericInput(
-        inputId = "cv_single",
-        label   = paste(label_prefix, "(", endp, ")"),
-        value   = 0.30, min = 0, max = 1, step = 0.01,
-        width   = "100%"
+      updateNumericInput(
+        session, "cv_single", label = paste0(lab_prefix, " (", endp, ")")
       )
     } else {
-      layout_columns(
-        col_widths = c(6, 6),
-        numericInput(
-          inputId = "cv_auc",
-          label   = paste(label_prefix, "(AUC)"),
-          value   = 0.30, min = 0, max = 1, step = 0.01,
-          width   = "100%"
-        ),
-        numericInput(
-          inputId = "cv_cmax",
-          label   = paste(repl_cmax_prefix, "(Cmax)"),
-          value   = 0.30, min = 0, max = 1, step = 0.01,
-          width   = "100%"
-        )
+      updateNumericInput(
+        session, "cv_auc", label = paste0(lab_prefix, " (AUC)")
+      )
+      updateNumericInput(
+        session, "cv_cmax", label = paste0(cmax_prefix, " (Cmax)")
       )
     }
   })
+  
+  # output$ui_cv <- renderUI({
+  #   single_cv   <- identical(mode(), "ni") || identical(mode(), "ns")
+  #   is_parallel <- identical(input$design, "parallel")
+  #   is_repl     <- is_replicative(input$design)
+  #   label_prefix     <- if (is_parallel) "CVinter" else "CVintra"
+  #   repl_cmax_prefix <- if (is_repl)     "CVwR"    else label_prefix
+  #   
+  #   if (single_cv) {
+  #     endp <- input$endp %||% "AUC"
+  #     numericInput(
+  #       inputId = "cv_single",
+  #       label   = paste(label_prefix, "(", endp, ")"),
+  #       value   = isolate(input$cv_single) %||% 0.30,
+  #       min = 0, max = 1, step = 0.01, width = "100%"
+  #     )
+  #   } else {
+  #     layout_columns(
+  #       col_widths = c(6, 6),
+  #       numericInput(
+  #         inputId = "cv_auc",
+  #         label   = paste(label_prefix, "(AUC)"),
+  #         value   = isolate(input$cv_auc) %||% 0.30,
+  #         min = 0, max = 1, step = 0.01, width = "100%"
+  #       ),
+  #       numericInput(
+  #         inputId = "cv_cmax",
+  #         label   = paste(repl_cmax_prefix, "(Cmax)"),
+  #         value   = isolate(input$cv_cmax) %||% 0.30,
+  #         min = 0, max = 1, step = 0.01, width = "100%"
+  #       )
+  #     )
+  #   }
+  # })
 
   output$ui_theta0 <- renderUI({
     ntidr  <- identical(input$ntid, "yes") && identical(input$design, "2x2x4")
@@ -314,22 +369,28 @@ server <- function(input, output, session) {
   
   # --- Calculate / Reset button -----
 
-  rv <- reactiveValues(calced = FALSE)
+  res_val <- reactiveVal(NULL)
   
-  observeEvent(input$calc_reset_btn, {rv$calced <- !rv$calced})
+  observeEvent(input$calc_btn, {
+    res_val(safe_compute(compute_result))
+  })
   
-  # Reset on tab change
-  observeEvent(input$module,  {if (isTRUE(rv$calced)) rv$calced <- FALSE})
-  observeEvent(input$be_mode, {if (isTRUE(rv$calced)) rv$calced <- FALSE})
+  observeEvent(input$reset_btn, {
+    res_val(NULL)
+    shinyjs::reset("be_form")
+  })
   
-  observeEvent(rv$calced, {
-    label <- if (isTRUE(rv$calced)) "Reset" else "Calculate"
-    updateActionButton(session, "calc_reset_btn", label = label)
-    if (!isTRUE(rv$calced)) {
-      if (identical(input$module, "be")) shinyjs::reset("be_form")
-      if (identical(input$module, "p1")) shinyjs::reset("p1_form")
-      if (identical(input$module, "p2")) shinyjs::reset("p2_form")
-    }
+  # change tabs BE/p1/p2/about
+  observeEvent(input$module, {
+    res_val(NULL)
+    shinyjs::reset("be_form")
+  }, ignoreInit = TRUE)
+  
+  
+  # change tabs on BE: equivalence/adaptive/NI/NS
+  observeEvent(input$be_mode, {
+    res_val(NULL)
+    shinyjs::reset("be_form")
   }, ignoreInit = TRUE)
 
   # --- Calculations -----------------------------------------------------------
@@ -415,7 +476,7 @@ server <- function(input, output, session) {
   }
   
   compute_result <- function() {
-    mode      <- mode()
+    c_mode    <- mode()
     is_ntid   <- identical(input$ntid, "yes")
     design    <- input$design
     power     <- input$power
@@ -424,17 +485,17 @@ server <- function(input, output, session) {
     cv_single <- input$cv_single
     theta0    <- input$theta0
     
-    margin  <- if (identical(mode, "ni")) 0.80 else 1.25
+    margin  <- if (identical(c_mode, "ni")) 0.80 else 1.25
     theta1  <- if (is_ntid) 0.90 else 0.80
     alpha  <- switch(
-      mode,
+      c_mode,
       "be_adapt" = 0.0294,
       "ni"       = 0.025,
       "ns"       = 0.025,
       0.05
     )
     
-    if (identical(mode, "ni") || identical(mode, "ns")) {
+    if (identical(c_mode, "ni") || identical(c_mode, "ns")) {
       res <- run_noninf(alpha, CV = cv_single, design, power, theta0, margin)
       methods <- data.frame(
         Endpoint = input$endp,
@@ -445,7 +506,8 @@ server <- function(input, output, session) {
       out <- list(
         n_total = res$n,
         methods = methods,
-        details = res$txt
+        details = res$txt,
+        design_used = design
       )
       return(out)
     } 
@@ -476,9 +538,10 @@ server <- function(input, output, session) {
     out <- list(
       n_total = n_total,
       methods = methods,
-      details = paste(auc$txt, cmax$txt, sep = "\n\n")
+      details = paste(auc$txt, cmax$txt, sep = "\n\n"),
+      design_used = design
     )
-    if (identical(mode, "be_adapt")) out$addon <- max(0L, n_total - (input$n1))
+    if (identical(c_mode, "be_adapt")) out$addon <- max(0L, n_total - (input$n1))
     return(out)
   }
   
@@ -542,19 +605,13 @@ server <- function(input, output, session) {
     )
   }
   
-  res_compute <- eventReactive(input$calc_reset_btn, {
-    safe_compute(compute_result)
-  }, ignoreInit = TRUE)
-  
   render_results_for <- function(tab) renderUI({
-    if (!isTRUE(rv$calced))
-      return(p(
-        "Select settings and press Calculate",
-        style = "text-align:center; margin:2rem;"
-      ))
-    r <- res_compute(); if (is.null(r)) return(NULL)
+    r <- res_val()
+    if (is.null(r))
+      return(p("Select settings and press Calculate",
+               style = "text-align:center; margin:2rem;"))
     if (!is.null(r$error)) return(tags$pre(r$error))
-    make_results_ui(r, input$design)
+    make_results_ui(r, r$design_used)
   })
   
   output$results_be       <- render_results_for("be")

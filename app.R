@@ -26,7 +26,6 @@ ui <- page_navbar(
   fillable = TRUE,
   header = tagList(
     shinyjs::useShinyjs(),
-    
     navset_card_tab(
       id = "module",
       
@@ -55,7 +54,7 @@ ui <- page_navbar(
                   numericInput(
                     inputId = "cv_single",
                     label   = "placeholder",
-                    value   = 0.30, min = 0, max = 1, step = 0.01, width = "100%"
+                    value = 0.30, min = 0, max = 1, step = 0.01, width = "100%"
                   )
                 ),
                 conditionalPanel(
@@ -65,12 +64,12 @@ ui <- page_navbar(
                     numericInput(
                       inputId = "cv_auc",
                       label   = "placeholder",
-                      value   = 0.30, min = 0, max = 1, step = 0.01, width = "100%"
+                      value = 0.30, min = 0, max = 1, step = 0.01, width = "100%"
                     ),
                     numericInput(
                       inputId = "cv_cmax",
                       label   = "placeholder",
-                      value   = 0.30, min = 0, max = 1, step = 0.01, width = "100%"
+                      value = 0.30, min = 0, max = 1, step = 0.01, width = "100%"
                     )
                   )
                 )
@@ -96,27 +95,40 @@ ui <- page_navbar(
             )
           ),
           
-          navset_card_tab(
-            id = "be_mode",
-            nav_panel(
-              title = "Equivalence",
-              value = "be",
-              uiOutput("results_be")
+          tagList(
+            div(class = "summary-wrap",
+                navset_card_tab(
+                  id = "be_mode",
+                  nav_panel(
+                    title = "Equivalence",
+                    value = "be",
+                    uiOutput("results_be")
+                  ),
+                  nav_panel(
+                    title = "Adaptive (Potvin B)",
+                    value = "be_adapt",
+                    uiOutput("results_be_adapt")
+                  ),
+                  nav_panel(
+                    title = "Non-inferiority",
+                    value = "ni",
+                    uiOutput("results_ni")
+                  ),
+                  nav_panel(
+                    title = "Non-superiority",
+                    value = "ns",
+                    uiOutput("results_ns")
+                  )
+                )
             ),
-            nav_panel(
-              title = "Adaptive (Potvin B)",
-              value = "be_adapt",
-              uiOutput("results_be_adapt")
-            ),
-            nav_panel(
-              title = "Non-inferiority",
-              value = "ni",
-              uiOutput("results_ni")
-            ),
-            nav_panel(
-              title = "Non-superiority",
-              value = "ns",
-              uiOutput("results_ns")
+            div(class = "mt-0",
+                bslib::accordion(
+                  id = "acc_out",
+                  bslib::accordion_panel(
+                    "Details (PowerTOST log)",
+                    uiOutput("results_details")
+                  )
+                )
             )
           )
         )
@@ -299,40 +311,6 @@ server <- function(input, output, session) {
     }
   })
   
-  # output$ui_cv <- renderUI({
-  #   single_cv   <- identical(mode(), "ni") || identical(mode(), "ns")
-  #   is_parallel <- identical(input$design, "parallel")
-  #   is_repl     <- is_replicative(input$design)
-  #   label_prefix     <- if (is_parallel) "CVinter" else "CVintra"
-  #   repl_cmax_prefix <- if (is_repl)     "CVwR"    else label_prefix
-  #   
-  #   if (single_cv) {
-  #     endp <- input$endp %||% "AUC"
-  #     numericInput(
-  #       inputId = "cv_single",
-  #       label   = paste(label_prefix, "(", endp, ")"),
-  #       value   = isolate(input$cv_single) %||% 0.30,
-  #       min = 0, max = 1, step = 0.01, width = "100%"
-  #     )
-  #   } else {
-  #     layout_columns(
-  #       col_widths = c(6, 6),
-  #       numericInput(
-  #         inputId = "cv_auc",
-  #         label   = paste(label_prefix, "(AUC)"),
-  #         value   = isolate(input$cv_auc) %||% 0.30,
-  #         min = 0, max = 1, step = 0.01, width = "100%"
-  #       ),
-  #       numericInput(
-  #         inputId = "cv_cmax",
-  #         label   = paste(repl_cmax_prefix, "(Cmax)"),
-  #         value   = isolate(input$cv_cmax) %||% 0.30,
-  #         min = 0, max = 1, step = 0.01, width = "100%"
-  #       )
-  #     )
-  #   }
-  # })
-
   output$ui_theta0 <- renderUI({
     ntidr  <- identical(input$ntid, "yes") && identical(input$design, "2x2x4")
     lab_be <- if (ntidr) "AUC T/R (θ₀) (using 0.975 for Cmax)" else "T/R (θ₀)"
@@ -507,7 +485,11 @@ server <- function(input, output, session) {
         n_total = res$n,
         methods = methods,
         details = res$txt,
-        design_used = design
+        design_used = design,
+        mode_used   = c_mode,
+        power_used  = power,
+        theta0_used = theta0,
+        drop_used   = input$drop
       )
       return(out)
     } 
@@ -539,7 +521,11 @@ server <- function(input, output, session) {
       n_total = n_total,
       methods = methods,
       details = paste(auc$txt, cmax$txt, sep = "\n\n"),
-      design_used = design
+      design_used = design,
+      mode_used   = c_mode,
+      power_used  = power,
+      theta0_used = theta0,
+      drop_used   = input$drop
     )
     if (identical(c_mode, "be_adapt")) out$addon <- max(0L, n_total - (input$n1))
     return(out)
@@ -569,47 +555,60 @@ server <- function(input, output, session) {
   
   table_tag <- function(df) {
     hdr <- tags$tr(lapply(names(df), tags$th))
-    rows <- apply(df, 1, function(x) tags$tr(lapply(as.list(x), tags$td)))
+    rows <- lapply(seq_len(nrow(df)), function(i) {
+      tags$tr(lapply(seq_along(df), function(j) {
+        cls <- if (is.numeric(df[[j]])) "text-end" else NULL
+        tags$td(class = cls, df[i, j, drop = TRUE])
+      }))
+    })
     tags$table(class = "table table-sm", tags$thead(hdr), tags$tbody(rows))
   }
   
   make_results_ui <- function(res, design) {
     alloc_df <- alloc_table(res$n_total, design)
-    cap <- if (identical(design, "parallel"))
-      "Allocation by arm" else "Allocation by sequence"
-    
-    right_boxes <- tagList(
-      bslib::value_box(
-        title = "Total N",
-        value = tags$span(res$n_total),
-        showcase = bsicons::bs_icon("calculator")
-      ),
-      if (!is.null(res$addon)) bslib::value_box(
-        title = "Add-on N",
-        value = tags$span(res$addon),
-        showcase = bsicons::bs_icon("plus")
+    cap <- if (identical(design, "parallel")) "Arm" else "Sequence"
+    method_pills <- lapply(seq_len(nrow(res$methods)), function(i) {
+      tags$span(
+        class = "metric",
+        paste0(res$methods$Endpoint[i], ": ", res$methods$Method[i])
+      )
+    })
+    metrics <- tags$div(
+      class = "metrics-bar",
+      tags$span(class = "metric", paste("Design:", design)),
+      tags$span(class = "metric", paste0("θ₀: ", res$theta0_used %||% input$theta0)),
+      tags$span(class = "metric",
+                paste0("Power: ", round((res$power_used %||% input$power) * 100), "%")),
+      if (!is.null(res$drop_used))
+        tags$span(class = "metric", paste0("Dropout: ", res$drop_used, "%")),
+      method_pills
+    )
+    right_box <- bslib::value_box(
+      title = NULL,
+      showcase = bsicons::bs_icon("calculator"),
+      value = tags$div(
+        class = "valuebox-grid",
+        tags$div(
+          class = "valuebox-left",
+          tags$div(class = "totaln-label", "Total N"),
+          tags$div(class = "totaln-value", res$n_total)
+        ),
+        tags$div(
+          class = "mini-alloc",
+          table_tag(setNames(alloc_df, c(cap, "n")))
+        )
       )
     )
-    
-    left_side <- tagList(
-      tags$h4(cap),
-      table_tag(alloc_df)
-    )
-    
-    tagList(
-      layout_columns(col_widths = c(8, 4), left_side, right_boxes),
-      tags$h4("By endpoint"),
-      table_tag(res$methods),
-      tags$h4("Details"),
-      tags$pre(res$details)
-    )
+    layout_columns(col_widths = c(8, 4), metrics, right_box)
   }
   
   render_results_for <- function(tab) renderUI({
     r <- res_val()
     if (is.null(r))
-      return(p("Select settings and press Calculate",
-               style = "text-align:center; margin:2rem;"))
+      return(p(
+        "Select settings and press Calculate",
+        style = "text-align:center; margin:2rem;"
+      ))
     if (!is.null(r$error)) return(tags$pre(r$error))
     make_results_ui(r, r$design_used)
   })
@@ -618,6 +617,16 @@ server <- function(input, output, session) {
   output$results_be_adapt <- render_results_for("be_adapt")
   output$results_ni       <- render_results_for("ni")
   output$results_ns       <- render_results_for("ns")
+  
+  output$results_details <- renderUI({
+    r <- res_val()
+    if (is.null(r))
+      return(p(
+        "Select settings and press Calculate",
+        style = "text-align:center; margin:2rem;"
+      ))
+    tags$pre(class = "pre-scroll", r$details)
+  })
 }
 
 shinyApp(ui, server)

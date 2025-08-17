@@ -20,7 +20,7 @@ ui <- page_navbar(
     ),
     tags$div(
       class = "name-subtitle",
-      "Goodbye guesswork, hello regulatory confidence"
+      "Goodbye guesswork, hello regulator-friendly designs"
     )
   ),
   fillable = TRUE,
@@ -28,26 +28,26 @@ ui <- page_navbar(
     shinyjs::useShinyjs(),
     tags$script(HTML(copy_js)),
     navset_card_tab(
-      id = "module",
-      
+      id = "main_navigation",
+
       # --- Bioequivalence -----
-      
+
       nav_panel(
         title = "Bioequivalence",
         value = "be",
         layout_columns(
           col_widths = c(3, 9),
-          class = "cols-tight mt-3",
-          
+          class = "layout-columns mt-3",
+
           card(
             class = "sidebar-card",
             card_header("Settings"),
-            
+
             div(
               id = "be_form",
               uiOutput(outputId = "ui_mode_specific"),
               uiOutput(outputId = "ui_design"),
-              
+
               div(
                 id = "cv_block",
                 conditionalPanel(
@@ -75,7 +75,7 @@ ui <- page_navbar(
                   )
                 )
               ),
-              
+
               uiOutput(outputId = "ui_theta0"),
               uiOutput("ui_power"),
               uiOutput("ui_dropout"),
@@ -95,65 +95,67 @@ ui <- page_navbar(
               )
             )
           ),
-          
+
           tagList(
-            div(class = "summary-wrap",
-                navset_card_tab(
-                  id = "be_mode",
-                  nav_panel(
-                    title = "Equivalence",
-                    value = "be",
-                    uiOutput("results_be")
-                  ),
-                  nav_panel(
-                    title = "Adaptive (Potvin B)",
-                    value = "be_adapt",
-                    uiOutput("results_be_adapt")
-                  ),
-                  nav_panel(
-                    title = "Non-inferiority",
-                    value = "ni",
-                    uiOutput("results_ni")
-                  ),
-                  nav_panel(
-                    title = "Non-superiority",
-                    value = "ns",
-                    uiOutput("results_ns")
-                  )
+            div(
+              class = "summary-wrap",
+              navset_card_tab(
+                id = "be_mode",
+                nav_panel(
+                  title = "Equivalence",
+                  value = "be",
+                  uiOutput("results_be")
+                ),
+                nav_panel(
+                  title = "Adaptive (Potvin B)",
+                  value = "be_adapt",
+                  uiOutput("results_be_adapt")
+                ),
+                nav_panel(
+                  title = "Non-inferiority",
+                  value = "ni",
+                  uiOutput("results_ni")
+                ),
+                nav_panel(
+                  title = "Non-superiority",
+                  value = "ns",
+                  uiOutput("results_ns")
                 )
+              )
             ),
-            div(class = "mt-0",
-                bslib::accordion(
-                  id = "acc_out",
-                  bslib::accordion_panel(
-                    "Details (PowerTOST log)",
-                    uiOutput("results_details")
-                  )
+            div(
+              class = "mt-0",
+              bslib::accordion(
+                id = "accordion_output",
+                bslib::accordion_panel(
+                  "Details (PowerTOST log)",
+                  uiOutput("results_details")
                 )
+              )
             )
           )
         )
       ),
-      
+
       # --- Phase I -----
-      
+
       nav_panel(
         title = "Phase I",
         value = "p1",
         layout_columns(
           col_widths = c(3, 9),
-          class = "cols-tight mt-3",
-          
+          class = "layout-columns mt-3",
+
           card(
             class = "sidebar-card",
             card_header("Settings"),
-            
+
             div(
               id = "p1_form",
               p("Coming Soon", style = "text-align: center; margin: 2rem; color: #6c757d;")
             )
           ),
-          
+
           navset_card_tab(
             id = "p1_mode",
             nav_panel(
@@ -164,26 +166,26 @@ ui <- page_navbar(
           )
         )
       ),
-      
+
       # --- Phase II -----
-      
+
       nav_panel(
         title = "Phase II",
         value = "p2",
         layout_columns(
           col_widths = c(3, 9),
-          class = "cols-tight mt-3",
-          
+          class = "layout-columns mt-3",
+
           card(
             class = "sidebar-card",
             card_header("Settings"),
-            
+
             div(
               id = "p2_form",
               p("Coming Soon", style = "text-align: center; margin: 2rem; color: #6c757d;")
             )
           ),
-          
+
           navset_card_tab(
             id = "p2_mode",
             nav_panel(
@@ -194,15 +196,15 @@ ui <- page_navbar(
           )
         )
       ),
-      
+
       # --- About -----
-      
+
       nav_panel(
         title = "About",
         value = "about",
         layout_columns(
           col_widths = c(12),
-          class = "cols-tight mt-3",
+          class = "layout-columns mt-3",
           div(
             p("Sample size planning toolkit.")
           )
@@ -231,9 +233,9 @@ server <- function(input, output, session) {
   }
   is_replicative <- function(d) isTRUE(d %in% c("2x2x3", "2x3x3", "2x2x4"))
   mode           <- reactive(input$be_mode %||% "be")
-  
+
   # --- Settings renderUI -----
-  
+
   # Endpoint selection only for NI/NS per spec; hidden for BE
   output$ui_mode_specific <- renderUI({
     switch(
@@ -272,7 +274,7 @@ server <- function(input, output, session) {
   output$ui_design <- renderUI({
     ntid     <- identical(input$ntid, "yes")
     adaptive <- identical(mode(), "be_adapt")
-    
+
     choices <- switch(
       mode(),
       "be" = 
@@ -296,7 +298,7 @@ server <- function(input, output, session) {
     is_repl     <- is_replicative(input$design)
     lab_prefix  <- if (is_parallel) "CVinter" else "CVintra"
     cmax_prefix <- if (is_repl) "CVwR" else lab_prefix
-    
+
     if (mode() %in% c("ni","ns")) {
       endp <- input$endp %||% "AUC"
       updateNumericInput(
@@ -311,7 +313,7 @@ server <- function(input, output, session) {
       )
     }
   })
-  
+
   output$ui_theta0 <- renderUI({
     ntidr  <- identical(input$ntid, "yes") && identical(input$design, "2x2x4")
     lab_be <- if (ntidr) "AUC T/R (θ₀) (using 0.975 for Cmax)" else "T/R (θ₀)"
@@ -322,7 +324,7 @@ server <- function(input, output, session) {
       numericInput(     "theta0", lab_be,     0.95, 0.90, 0.95, 0.01)
     )
   })
-  
+
   output$ui_power <- renderUI({
     val <- if (identical(mode(), "be_adapt")) 0.90 else 0.80
     sliderInput(
@@ -332,7 +334,7 @@ server <- function(input, output, session) {
       ticks   = TRUE
     )
   })
-  
+
   output$ui_dropout <- renderUI({
     if (mode() %in% c("be", "ni", "ns")) {
       numericInput(
@@ -345,33 +347,33 @@ server <- function(input, output, session) {
       NULL
     }
   })
-  
+
   # --- Calculate / Reset button -----
 
-  res_val <- reactiveVal(NULL)
-  
+  calc_results <- reactiveVal(NULL)
+
   observeEvent(input$calc_btn, {
-    res_val(safe_compute(compute_result))
+    calc_results(safe_compute(compute_result))
   })
-  
+
   observeEvent(input$reset_btn, {
-    res_val(NULL)
+    calc_results(NULL)
     shinyjs::reset("be_form")
   })
-  
+
   # change tabs BE/p1/p2/about
   observeEvent(input$module, {
-    res_val(NULL)
+    calc_results(NULL)
   }, ignoreInit = TRUE)
 
 
   # change tabs on BE: equivalence/adaptive/NI/NS
   observeEvent(input$be_mode, {
-    res_val(NULL)
+    calc_results(NULL)
   }, ignoreInit = TRUE)
 
   # --- Calculations -----------------------------------------------------------
-  
+
   # TOST-version specific expraction
   extract_n <- function(res) {
     n <- suppressWarnings(as.integer(res[["Sample size"]]))
@@ -401,7 +403,7 @@ server <- function(input, output, session) {
     }), collapse = "\n")
     list(n = extract_n(r), txt = txt, method = "TOST")
   }
-  
+
   run_scABEL <- function(alpha, CV, design, power, theta0, theta1) {
     txt <- paste(capture.output({
       r <- PowerTOST::sampleN.scABEL(
@@ -418,7 +420,7 @@ server <- function(input, output, session) {
     }), collapse = "\n")
     list(n = extract_n(r), txt = txt, method = "scABEL (EMA)")
   }
-  
+
   run_NTID <- function(alpha, CV, design, power, theta0, theta1) {
     txt <- paste(capture.output({
       r <- PowerTOST::sampleN.NTID(
@@ -434,7 +436,7 @@ server <- function(input, output, session) {
     }), collapse = "\n")
     list(n = extract_n(r), txt = txt, method = "NTID (RSABE)")
   }
-  
+
   run_noninf <- function(alpha, CV, design, power, theta0, margin) {
     txt <- paste(capture.output({
       r <- PowerTOST::sampleN.noninf(
@@ -451,7 +453,7 @@ server <- function(input, output, session) {
     meth <- if (isTRUE(margin < 1)) "Non-inferiority" else "Non-superiority"
     list(n = extract_n(r), txt = txt, method = meth)
   }
-  
+
   add_be_notes <- function(notes, is_repl, is_ntid, cv_cmax, use_scABEL) {
     if (!is_repl && cv_cmax > 0.30 && !is_ntid) {
       notes <- c(
@@ -464,7 +466,7 @@ server <- function(input, output, session) {
         )
       )
     }
-    
+
     if (use_scABEL) {
       notes <- c(
         notes,
@@ -476,7 +478,7 @@ server <- function(input, output, session) {
         )
       )
     }
-    
+
     if (is_ntid && is_repl) {
       notes <- c(
         notes,
@@ -489,10 +491,10 @@ server <- function(input, output, session) {
         )
       )
     }
-    
+
     notes
   }
-  
+
   compute_result <- function() {
     c_mode    <- mode()
     is_ntid   <- identical(input$ntid, "yes")
@@ -503,7 +505,7 @@ server <- function(input, output, session) {
     cv_single <- input$cv_single
     theta0    <- input$theta0
     dropout   <- input$drop
-    
+
     margin  <- if (identical(c_mode, "ni")) 0.80 else 1.25
     theta1  <- if (is_ntid) 0.90 else 0.80
     alpha  <- switch(
@@ -514,7 +516,7 @@ server <- function(input, output, session) {
       0.05
     )
     notes <- character(0)
-    
+
     if (identical(c_mode, "ni") || identical(c_mode, "ns")) {
       endp <- input$endp
       res  <- run_noninf(alpha, CV = cv_single, design, power, theta0, margin)
@@ -529,13 +531,13 @@ server <- function(input, output, session) {
     } else {
       # always TOST for AUC
       auc <- run_TOST(alpha, CV = cv_auc, design, power, theta0, theta1)
-      
+
       # different methods for Cmax
       is_repl <- is_replicative(design)
-      
+
       use_scABEL <- is_repl && !is_ntid && (cv_cmax > 0.30)
       use_NTID   <- is_repl && is_ntid
-      
+
       cmax_fn <- if (use_NTID) {
         run_NTID
       } else if (use_scABEL) {
@@ -543,7 +545,7 @@ server <- function(input, output, session) {
       } else {
         run_TOST
       }
-      
+
       cmax_args <- list(
         alpha  = alpha,
         CV     = cv_cmax,
@@ -553,7 +555,7 @@ server <- function(input, output, session) {
         theta1 = if (!is_repl) theta1 else 0.80
       )
       cmax <- do.call(cmax_fn, cmax_args)
-      
+
       n_total <- max(auc$n, cmax$n, na.rm = TRUE)
       methods <- data.frame(
         Endpoint = c("AUC", "Cmax"),
@@ -564,7 +566,7 @@ server <- function(input, output, session) {
       details <- list(auc = auc$txt, cmax = cmax$txt)
       notes <- add_be_notes(notes, is_repl, is_ntid, cv_cmax, use_scABEL)
     }
-    
+
     out <- list(
       n_total     = n_total,
       methods     = methods,
@@ -575,7 +577,7 @@ server <- function(input, output, session) {
       theta0_used = theta0,
       notes       = notes
     )
-    
+
     if (identical(c_mode, "be_adapt")) {
       out$addon <- max(0L, out$n_total - (input$n1))
     } else {
@@ -584,12 +586,12 @@ server <- function(input, output, session) {
         out$drop_used   = dropout
       }
     }
-    
+
     return(out)
   }
-  
+
   # --- Bind outputs -----------------------------------------------------------
-  
+
   seq_map <- list(
     parallel = c("T", "R"),
     "2x2"    = c("TR", "RT"),
@@ -597,7 +599,7 @@ server <- function(input, output, session) {
     "2x3x3"  = c("TRR", "RTR", "RRT"),
     "2x2x4"  = c("TRTR", "RTRT")
   )
-  
+
   alloc_table <- function(n_total, design) {
     s <- seq_map[[design]] %||% c("T", "R")
     k <- length(s)
@@ -609,8 +611,8 @@ server <- function(input, output, session) {
     names(df)[1] <- nm
     df
   }
-  
-  table_tag <- function(df) {
+
+  build_mini_alloc_table <- function(df) {
     hdr <- tags$tr(lapply(names(df), tags$th))
     rows <- lapply(seq_len(nrow(df)), function(i) {
       tags$tr(lapply(seq_along(df), function(j) {
@@ -620,43 +622,45 @@ server <- function(input, output, session) {
     })
     tags$table(class = "table table-sm", tags$thead(hdr), tags$tbody(rows))
   }
-  
-  ep_box <- function(ep, cv, meth, n){
+
+  build_endpoint_card <- function(ep, cv, meth, n){
     tags$div(
-      class = "ep-card",
+      class = "endpoint-card",
       tags$div(
-        class = "ep-line",
+        class = "endpoint-line",
         sprintf("%s (CV %.2f)", ep, cv)
       ),
       tags$div(
-        class = "ep-line",
+        class = "endpoint-line",
         sprintf("%s: N =  %s", meth, n)
       )
     )
   }
-  
-  build_endpoint_summary <- function(res, n1 = NULL){
+
+  build_endpoint_comparison <- function(res, n1 = NULL){
     m <- res$methods
     core <- if (nrow(m) >= 2){
       op <- if (m$N[1] < m$N[2]) "<" else if (m$N[1] > m$N[2]) ">" else "="
-      tags$div(class = "compare-center",
-               ep_box(m$Endpoint[1], m$CV[1], m$Method[1], m$N[1]),
-               tags$div(class = "op-bubble", op),
-               ep_box(m$Endpoint[2], m$CV[2], m$Method[2], m$N[2])
+      tags$div(
+        class = "compare-center",
+        build_endpoint_card(m$Endpoint[1], m$CV[1], m$Method[1], m$N[1]),
+        tags$div(class = "operator-badge", op),
+        build_endpoint_card(m$Endpoint[2], m$CV[2], m$Method[2], m$N[2])
       )
     } else {
-      tags$div(class = "compare-center",
-               ep_box(m$Endpoint[1], m$CV[1], m$Method[1], m$N[1])
+      tags$div(
+        class = "compare-center",
+        build_endpoint_card(m$Endpoint[1], m$CV[1], m$Method[1], m$N[1])
       )
     }
-    
+
     if (identical(res$mode_used, "be_adapt") && !is.null(n1)) {
       form <- tags$div(
         class = "formula-row",
         tags$span(class="formula-chip", paste0("Stage 1: ", n1)),
-        tags$span(class="op-bubble", "\u2794"),
+        tags$span(class="operator-badge", "\u2794"),
         tags$span(class="formula-chip", paste0("+ Additional: ", res$addon)),
-        tags$span(class="op-bubble", "="),
+        tags$span(class="operator-badge", "="),
         tags$span(class="formula-chip", paste0("Total: ", res$n_total))
       )
       tags$div(core, form)
@@ -664,33 +668,33 @@ server <- function(input, output, session) {
       core
     }
   }
-  
+
   make_results_ui <- function(res, design) {
-    alloc_df <- alloc_table(res$n_total, design)
-    cap <- if (identical(design, "parallel")) "Arm" else "Sequence"
-    
-    method_info <- build_endpoint_summary(res, n1 = input$n1)
-    
-    metrics <- tags$div(
-      class = "metrics-grid",
+    method_info <- build_endpoint_comparison(res, n1 = input$n1)
+
+    params_stack <- tags$div(
+      class = "methods-grid",
       tags$div(
-        class = "metrics-stack",
+        class = "parameters-stack",
         tags$span(class = "metric", paste("Design:", design)),
-        tags$span(class = "metric", paste0("θ₀: ", res$theta0_used %||% input$theta0)),
-        tags$span(class = "metric",
-                  paste0("Power: ", round((res$power_used %||% input$power) * 100), "%")),
+        tags$span(class = "metric", paste0("θ₀: ", res$theta0_used)),
+        tags$span(
+          class = "metric",
+          paste0("Power: ", round((res$power_used) * 100), "%")
+        ),
         if (!is.null(res$drop_used))
           tags$span(class = "metric", paste0("Dropout: ", res$drop_used, "%"))
       ),
       tags$div(class = "compare-cell", method_info)
     )
-    
-    right_box <- {
+
+    calculator_box <- {
+      cap      <- if (identical(design, "parallel")) "Arm" else "Sequence"
       is_adapt <- identical(res$mode_used, "be_adapt")
-      lbl <- if (is_adapt) "To recruit" else "Total N"
-      val <- if (is_adapt) res$addon     else res$n_total
-      alloc_for_box <- if (is_adapt) alloc_table(val, design) else alloc_df
-      
+      lbl      <- if (is_adapt) "To recruit" else "Total N"
+      val      <- if (is_adapt) res$addon    else res$n_total
+      alloc_for_box <- alloc_table(val, design)
+
       bslib::value_box(
         title = NULL,
         showcase = bsicons::bs_icon("calculator"),
@@ -698,88 +702,92 @@ server <- function(input, output, session) {
           class = "valuebox-grid",
           tags$div(
             class = "valuebox-left",
-            tags$div(class = "totaln-label", lbl),
-            tags$div(class = "totaln-value", val)
+            tags$div(class = "sample-size-label", lbl),
+            tags$div(class = "sample-size-value", val)
           ),
           tags$div(
-            class = "mini-alloc",
-            table_tag(setNames(alloc_for_box, c(cap, "n")))
+            class = "mini-alloc-table",
+            build_mini_alloc_table(setNames(alloc_for_box, c(cap, "n")))
           )
         )
       )
     }
-    layout_columns(col_widths = c(8, 4), metrics, right_box)
+    layout_columns(col_widths = c(8, 4), params_stack, calculator_box)
   }
-  
-  render_results_for <- function(tab) renderUI({
-    r <- res_val()
-    if (is.null(r))
-      return(p(
-        "Select settings and press Calculate",
-        style = "text-align:center; margin:2rem;"
-      ))
-    if (!is.null(r$error)) return(tags$pre(r$error))
-    ui <- make_results_ui(r, r$design_used)
-    
-    notes <- if (length(r$notes) > 0) {
-      div(
-        class = "results-notes",
-        tags$strong("Notes:"),
-        lapply(r$notes, function(x) HTML(x))
-      )
-    }
-    
-    tagList(ui, notes)
-  })
-  
+
+  render_results_for <- function(tab) {
+    renderUI({
+      r <- calc_results()
+      if (is.null(r))
+        return(p(
+          "Select settings and press Calculate",
+          style = "text-align:center; margin:2rem;"
+        ))
+      if (!is.null(r$error)) return(tags$pre(r$error))
+      ui <- make_results_ui(r, r$design_used)
+
+      notes <- if (length(r$notes) > 0) {
+        div(
+          class = "results-notes",
+          tags$strong("Notes:"),
+          lapply(r$notes, function(x) HTML(x))
+        )
+      }
+      tagList(ui, notes)
+    })
+  }
+
   output$results_be       <- render_results_for("be")
   output$results_be_adapt <- render_results_for("be_adapt")
   output$results_ni       <- render_results_for("ni")
   output$results_ns       <- render_results_for("ns")
-  
+
   output$results_details <- renderUI({
-    r <- res_val()
+    r <- calc_results()
     if (is.null(r)) return(p(
       "Select settings and press Calculate",
       style = "text-align:center; margin:2rem;"
     ))
-    
+
     if (length(r$details) == 2) {
       layout_columns(
         col_widths = c(6, 6),
         div(
           tags$strong("AUC"),
-          div(class = "codebox",
-              actionLink(
-                "copy_auc", NULL, class = "copy-btn",
-                icon = icon("copy"), title = "Copy",
-                onclick = "copyTextById('log_auc','copy_auc'); return false;"
-              ),
-              tags$pre(id = "log_auc", class = "pre-scroll", r$details$auc)
+          div(
+            class = "codebox",
+            actionLink(
+              "copy_auc", NULL, class = "copy-btn",
+              icon = icon("copy"), title = "Copy",
+              onclick = "copyResultsToClipboard('log_auc','copy_auc'); return false;"
+            ),
+            tags$pre(id = "log_auc", class = "pre-scroll", r$details$auc)
           )
         ),
         div(
           tags$strong("Cmax"),
-          div(class = "codebox",
-              actionLink(
-                "copy_cmax", NULL, class = "copy-btn",
-                icon = icon("copy"), title = "Copy",
-                onclick = "copyTextById('log_cmax','copy_cmax'); return false;"
-              ),
-              tags$pre(id = "log_cmax", class = "pre-scroll", r$details$cmax)
+          div(
+            class = "codebox",
+            actionLink(
+              "copy_cmax", NULL, class = "copy-btn",
+              icon = icon("copy"), title = "Copy",
+              onclick = "copyResultsToClipboard('log_cmax','copy_cmax'); return false;"
+            ),
+            tags$pre(id = "log_cmax", class = "pre-scroll", r$details$cmax)
           )
         )
       )
     } else {
       div(
         tags$strong(names(r$details)[1]),
-        div(class = "codebox",
-            actionLink(
-              "copy_single", NULL, class = "copy-btn",
-              icon = icon("copy"), title = "Copy",
-              onclick = "copyTextById('log_single','copy_single'); return false;"
-            ),
-            tags$pre(id = "log_single", class = "pre-scroll", r$details[[1]])
+        div(
+          class = "codebox",
+          actionLink(
+            "copy_single", NULL, class = "copy-btn",
+            icon = icon("copy"), title = "Copy",
+            onclick = "copyResultsToClipboard('log_single','copy_single'); return false;"
+          ),
+          tags$pre(id = "log_single", class = "pre-scroll", r$details[[1]])
         )
       )
     }

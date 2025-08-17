@@ -46,7 +46,7 @@ theme <- bslib::bs_add_rules(theme, "
 
 # Columns gap
 theme <- bslib::bs_add_rules(theme, "
-  .cols-tight {
+  .layout-columns {
     --tight-gap: 1rem;
     gap: var(--tight-gap) !important;
   }
@@ -123,13 +123,13 @@ theme <- bslib::bs_add_rules(theme, "
 
 
 copy_js <- "
-window.copyTextById = function(id, btnId){
+window.copyResultsToClipboard = function(id, btnId){
   const el = document.getElementById(id);
   if(!el) return;
   const txt = el.textContent || '';
   if(navigator.clipboard && window.isSecureContext){
     navigator.clipboard.writeText(txt).then(function(){
-      window.showCopyFeedback(btnId);
+      window.showCopySuccessIndicator(btnId);
     }).catch(function(err){
       console.error('Clipboard write failed', err);
     });
@@ -140,13 +140,13 @@ window.copyTextById = function(id, btnId){
     ta.focus(); ta.select();
     try {
       document.execCommand('copy');
-      window.showCopyFeedback(btnId);
+      window.showCopySuccessIndicator(btnId);
     } catch (err) { console.error(err); }
     document.body.removeChild(ta);
   }
 }
 
-window.showCopyFeedback = function(btnId){
+window.showCopySuccessIndicator = function(btnId){
   const btn = document.getElementById(btnId);
   if(!btn) return;
   const icon = btn.querySelector('i');
@@ -164,22 +164,20 @@ window.showCopyFeedback = function(btnId){
 
 theme <- bslib::bs_add_rules(theme, "
   :root{
-    --ssp-gap: .5rem;
-    --ssp-pill-radius: 9999px;
-    --ssp-totaln-label-size: .8rem;
-    --ssp-totaln-value-size: 2rem;
-    --ssp-pill-font-size: .85rem;
-    --ssp-mini-alloc-font-size: .85rem;
+    --sample-size-label-font-size: .8rem;
+    --sample-size-value-font-size: 2rem;
+    --badge-font-size: .85rem;
+    --mini-alloc-table-font-size: .85rem;
   }
   
-  /* Metrics (pill) */
+  /* Parameter badges */
   .metric,
   .formula-chip{
     border:1px solid var(--bs-border-color);
-    border-radius:var(--bs-border-radius); /*--ssp-pill-radius*/
+    border-radius:var(--bs-border-radius);
     padding:.25rem .6rem;
     background:var(--bs-body-bg);
-    font-size:var(--ssp-pill-font-size);
+    font-size:var(--badge-font-size);
   }
   
   /* Value box settings */
@@ -193,7 +191,7 @@ theme <- bslib::bs_add_rules(theme, "
     padding: 1.5rem 1.5rem 1.5rem 1rem !important;
   }
 
-  /* Value box layout for Total N */
+  /* Sample size box layout */
   .valuebox-grid{
     display:grid;
     grid-template-columns: 1fr 1fr;
@@ -201,27 +199,27 @@ theme <- bslib::bs_add_rules(theme, "
     column-gap: .5rem;
     align-items: center;
   }
-  .totaln-label{
-    font-size:var(--ssp-totaln-label-size);
+  .sample-size-label{
+    font-size:var(--sample-size-label-font-size);
     color:var(--bs-secondary-color);
     text-transform:uppercase;
     letter-spacing:.02em;
     margin-bottom:.1rem;
   }
-  .totaln-value{
-    font-size:var(--ssp-totaln-value-size);
+  .sample-size-value{
+    font-size:var(--sample-size-value-font-size);
     font-weight:500;
   }
 
   /* Mini allocation table */
-  .mini-alloc .table{
+  .mini-alloc-table .table{
     justify-self: stretch;
     width: 100%;
     margin:0;
-    font-size: var(--ssp-mini-alloc-font-size);
+    font-size: var(--mini-alloc-table-font-size);
   }
-  .mini-alloc .table > :not(caption) > * > th:last-child,
-  .mini-alloc .table > :not(caption) > * > td:last-child{
+  .mini-alloc-table .table > :not(caption) > * > th:last-child,
+  .mini-alloc-table .table > :not(caption) > * > td:last-child{
     text-align: center !important;
   }
   
@@ -234,7 +232,7 @@ theme <- bslib::bs_add_rules(theme, "
 # Metrics layout: left pill stack + centered endpoint cards and formula
 theme <- bslib::bs_add_rules(theme, "
   /* grid: left pills, right comparison area */
-  .metrics-grid {
+  .methods-grid {
     display: grid;
     grid-template-columns: clamp(120px, 22vw, 132px) minmax(0, 1fr);
     gap: .75rem 1rem;
@@ -242,12 +240,12 @@ theme <- bslib::bs_add_rules(theme, "
   }
 
   /* left column: vertical pills, width fits content */
-  .metrics-stack {
+  .parameters-stack {
     display: flex;
     flex-direction: column;
     gap: .5rem;
   }
-  .metrics-stack > .metric {
+  .parameters-stack > .metric {
     align-self: flex-start;
     width: max-content;
   }
@@ -266,7 +264,7 @@ theme <- bslib::bs_add_rules(theme, "
   }
 
   /* endpoint card */
-  .ep-card {
+  .endpoint-card {
     display: inline-flex;
     flex-direction: column;
     justify-content: center;
@@ -278,12 +276,12 @@ theme <- bslib::bs_add_rules(theme, "
     border: 1px solid var(--bs-border-color);
     border-radius: var(--bs-border-radius);
   }
-  .ep-line {
+  .endpoint-line {
     font-weight: 500;
   }
 
-  /* operator bubble between endpoint cards */
-  .op-bubble {
+  /* Comparison operator badge */
+  .operator-badge {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -311,7 +309,7 @@ theme <- bslib::bs_add_rules(theme, "
   }
   
   @media (max-width: 768px) {
-    .metrics-grid {
+    .methods-grid {
       grid-template-columns: 1fr;
     }
   }

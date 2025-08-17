@@ -26,6 +26,7 @@ ui <- page_navbar(
   fillable = TRUE,
   header = tagList(
     shinyjs::useShinyjs(),
+    tags$script(HTML(copy_js)),
     navset_card_tab(
       id = "module",
       
@@ -361,14 +362,12 @@ server <- function(input, output, session) {
   # change tabs BE/p1/p2/about
   observeEvent(input$module, {
     res_val(NULL)
-    shinyjs::reset("be_form")
   }, ignoreInit = TRUE)
-  
-  
+
+
   # change tabs on BE: equivalence/adaptive/NI/NS
   observeEvent(input$be_mode, {
     res_val(NULL)
-    shinyjs::reset("be_form")
   }, ignoreInit = TRUE)
 
   # --- Calculations -----------------------------------------------------------
@@ -462,6 +461,7 @@ server <- function(input, output, session) {
     cv_cmax   <- input$cv_cmax
     cv_single <- input$cv_single
     theta0    <- input$theta0
+    dropout   <- input$drop
     
     margin  <- if (identical(c_mode, "ni")) 0.80 else 1.25
     theta1  <- if (is_ntid) 0.90 else 0.80
@@ -474,60 +474,62 @@ server <- function(input, output, session) {
     )
     
     if (identical(c_mode, "ni") || identical(c_mode, "ns")) {
-      res <- run_noninf(alpha, CV = cv_single, design, power, theta0, margin)
+      endp <- input$endp
+      res  <- run_noninf(alpha, CV = cv_single, design, power, theta0, margin)
+      n_total <- res$n
       methods <- data.frame(
-        Endpoint = input$endp,
+        Endpoint = endp,
         Method   = res$method,
         CV       = cv_single,
         N        = res$n
       )
-      out <- list(
-        n_total = res$n,
-        methods = methods,
-        details = res$txt,
-        design_used = design,
-        mode_used   = c_mode,
-        power_used  = power,
-        theta0_used = theta0,
-        drop_used   = input$drop
+      details <- setNames(list(res$txt), endp)
+    } else {
+      # always TOST for AUC
+      auc <- run_TOST(alpha, CV = cv_auc, design, power, theta0, theta1)
+      
+      # different methods for Cmax
+      is_repl <- is_replicative(design)
+      cmax_fn <- if (!is_repl) run_TOST else if (is_ntid) run_NTID else run_scABEL
+      cmax_args <- list(
+        alpha  = alpha,
+        CV     = cv_cmax,
+        design = design,
+        power  = power,
+        theta0 = if (is_repl && is_ntid) 0.975 else theta0,
+        theta1 = if (!is_repl) theta1 else 0.80
       )
-      return(out)
-    } 
+      cmax <- do.call(cmax_fn, cmax_args)
+      
+      n_total <- max(auc$n, cmax$n, na.rm = TRUE)
+      methods <- data.frame(
+        Endpoint = c("AUC", "Cmax"),
+        Method   = c(auc$method, cmax$method),
+        CV       = c(cv_auc, cv_cmax),
+        N        = c(auc$n, cmax$n)
+      )
+      details <- list(auc = auc$txt, cmax = cmax$txt)
+    }
     
-    # always TOST for AUC
-    auc  <- run_TOST(alpha, CV = cv_auc, design, power, theta0, theta1)
-    
-    # different methods for Cmax
-    is_repl <- is_replicative(design)
-    cmax_fn <- if (!is_repl) run_TOST else if (is_ntid) run_NTID else run_scABEL
-    cmax_args <- list(
-      alpha  = alpha,
-      CV     = cv_cmax,
-      design = design,
-      power  = power,
-      theta0 = if (is_repl && is_ntid) 0.975 else theta0,
-      theta1 = if (!is_repl) theta1 else 0.80
-    )
-    cmax <- do.call(cmax_fn, cmax_args)
-    
-    n_total <- max(auc$n, cmax$n, na.rm = TRUE)
-    methods <- data.frame(
-      Endpoint = c("AUC", "Cmax"),
-      Method   = c(auc$method, cmax$method),
-      CV       = c(cv_auc, cv_cmax),
-      N        = c(auc$n, cmax$n)
-    )
     out <- list(
-      n_total = n_total,
-      methods = methods,
-      details = paste(auc$txt, cmax$txt, sep = "\n\n"),
+      n_total     = n_total,
+      methods     = methods,
+      details     = details,
       design_used = design,
       mode_used   = c_mode,
       power_used  = power,
-      theta0_used = theta0,
-      drop_used   = input$drop
+      theta0_used = theta0
     )
-    if (identical(c_mode, "be_adapt")) out$addon <- max(0L, n_total - (input$n1))
+    
+    if (identical(c_mode, "be_adapt")) {
+      out$addon <- max(0L, out$n_total - (input$n1))
+    } else {
+      if (!is.null(dropout) && dropout > 0) {
+        out$n_total <- ceiling(out$n_total / (1 - dropout/100))
+        out$drop_used   = dropout
+      }
+    }
+    
     return(out)
   }
   
@@ -620,12 +622,50 @@ server <- function(input, output, session) {
   
   output$results_details <- renderUI({
     r <- res_val()
-    if (is.null(r))
-      return(p(
-        "Select settings and press Calculate",
-        style = "text-align:center; margin:2rem;"
-      ))
-    tags$pre(class = "pre-scroll", r$details)
+    if (is.null(r)) return(p(
+      "Select settings and press Calculate",
+      style = "text-align:center; margin:2rem;"
+    ))
+    
+    if (length(r$details) == 2) {
+      layout_columns(
+        col_widths = c(6, 6),
+        div(
+          tags$strong("AUC"),
+          div(class = "codebox",
+              actionLink(
+                "copy_auc", NULL, class = "copy-btn",
+                icon = icon("copy"), title = "Copy",
+                onclick = "copyTextById('log_auc','copy_auc'); return false;"
+              ),
+              tags$pre(id = "log_auc", class = "pre-scroll", r$details$auc)
+          )
+        ),
+        div(
+          tags$strong("Cmax"),
+          div(class = "codebox",
+              actionLink(
+                "copy_cmax", NULL, class = "copy-btn",
+                icon = icon("copy"), title = "Copy",
+                onclick = "copyTextById('log_cmax','copy_cmax'); return false;"
+              ),
+              tags$pre(id = "log_cmax", class = "pre-scroll", r$details$cmax)
+          )
+        )
+      )
+    } else {
+      div(
+        tags$strong(names(r$details)[1]),
+        div(class = "codebox",
+            actionLink(
+              "copy_single", NULL, class = "copy-btn",
+              icon = icon("copy"), title = "Copy",
+              onclick = "copyTextById('log_single','copy_single'); return false;"
+            ),
+            tags$pre(id = "log_single", class = "pre-scroll", r$details[[1]])
+        )
+      )
+    }
   })
 }
 

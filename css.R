@@ -88,6 +88,84 @@ theme <- bslib::bs_add_rules(theme, "
   }
 ")
 
+# Copy icon
+theme <- bslib::bs_add_rules(theme, "
+  .copy-btn {
+    color: var(--bs-secondary);
+    opacity: .7;
+  }
+  .copy-btn:hover {
+    color: var(--bs-secondary);
+    opacity: 1;
+  }
+  .copy-btn.copied {
+    color: var(--bs-primary-text-emphasis);
+    opacity: .7;
+  }
+  .copy-btn.copied:hover {
+    color: var(--bs-primary-text-emphasis);
+    opacity: 1;
+  }
+")
+
+theme <- bslib::bs_add_rules(theme, "
+  .codebox {
+    position: relative;
+  }
+  .codebox .copy-btn {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+  .codebox .copy-btn .fa {
+    font-size: 1rem;
+  }
+  .codebox pre {
+    padding-top: 2rem; /* чтобы кнопка не налезала на текст */
+  }
+")
+
+copy_js <- "
+window.copyTextById = function(id, btnId){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const txt = el.textContent || '';
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(txt).then(function(){
+      window.showCopyFeedback(btnId);
+    }).catch(function(err){
+      console.error('Clipboard write failed', err);
+    });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try {
+      document.execCommand('copy');
+      window.showCopyFeedback(btnId);
+    } catch (err) { console.error(err); }
+    document.body.removeChild(ta);
+  }
+}
+
+window.showCopyFeedback = function(btnId){
+  const btn = document.getElementById(btnId);
+  if(!btn) return;
+  const icon = btn.querySelector('i');
+  if(!icon) return;
+  icon.className = 'fa fa-clipboard-check';
+  btn.classList.add('copied');
+  setTimeout(function(){
+    icon.className = 'fa fa-copy';
+    btn.classList.remove('copied');
+  }, 1000);
+}
+"
+
 # ===================== Components  ============================================
 
 theme <- bslib::bs_add_rules(theme, "

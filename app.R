@@ -20,7 +20,7 @@ ui <- page_navbar(
     ),
     tags$div(
       class = "name-subtitle",
-      "Goodbye guesswork, hello guidelines"
+      "Goodbye guesswork, hello regulatory confidence"
     )
   ),
   fillable = TRUE,
@@ -452,6 +452,47 @@ server <- function(input, output, session) {
     list(n = extract_n(r), txt = txt, method = meth)
   }
   
+  add_be_notes <- function(notes, is_repl, is_ntid, cv_cmax, use_scABEL) {
+    if (!is_repl && cv_cmax > 0.30 && !is_ntid) {
+      notes <- c(
+        notes,
+        paste0(
+          "For highly variable Cmax (CV > 30%), a replicate design is recommended ",
+          "to allow scaling of BE limits ",
+          "<a href='https://www.ema.europa.eu/en/investigation-bioequivalence-",
+          "scientific-guideline' target='_blank'>(EMA)</a>."
+        )
+      )
+    }
+    
+    if (use_scABEL) {
+      notes <- c(
+        notes,
+        paste0(
+          "Sample size is based on scABEL (scaled limits). ",
+          "<a href='https://www.ema.europa.eu/en/investigation-bioequivalence-",
+          "scientific-guideline' target='_blank'>EMA</a> also requires the point ",
+          "estimate (GMR) to lie within [0.80; 1.25]."
+        )
+      )
+    }
+    
+    if (is_ntid && is_repl) {
+      notes <- c(
+        notes,
+        paste0(
+          "Sample size is based on RSABE with fixed parameters. ",
+          "<a href='https://www.fda.gov/regulatory-information/search-fda-guidance-",
+          "documents' target='_blank'>FDA</a> also requires passing unscaled ABE ",
+          "(80.00–125.00%) and that the upper limit of the 90% confidence interval ",
+          "for \u03c3wT/\u03c3wR \u2264 2.5."
+        )
+      )
+    }
+    
+    notes
+  }
+  
   compute_result <- function() {
     c_mode    <- mode()
     is_ntid   <- identical(input$ntid, "yes")
@@ -472,6 +513,7 @@ server <- function(input, output, session) {
       "ns"       = 0.025,
       0.05
     )
+    notes <- character(0)
     
     if (identical(c_mode, "ni") || identical(c_mode, "ns")) {
       endp <- input$endp
@@ -490,7 +532,18 @@ server <- function(input, output, session) {
       
       # different methods for Cmax
       is_repl <- is_replicative(design)
-      cmax_fn <- if (!is_repl) run_TOST else if (is_ntid) run_NTID else run_scABEL
+      
+      use_scABEL <- is_repl && !is_ntid && (cv_cmax > 0.30)
+      use_NTID   <- is_repl && is_ntid
+      
+      cmax_fn <- if (use_NTID) {
+        run_NTID
+      } else if (use_scABEL) {
+        run_scABEL
+      } else {
+        run_TOST
+      }
+      
       cmax_args <- list(
         alpha  = alpha,
         CV     = cv_cmax,
@@ -509,6 +562,7 @@ server <- function(input, output, session) {
         N        = c(auc$n, cmax$n)
       )
       details <- list(auc = auc$txt, cmax = cmax$txt)
+      notes <- add_be_notes(notes, is_repl, is_ntid, cv_cmax, use_scABEL)
     }
     
     out <- list(
@@ -518,7 +572,8 @@ server <- function(input, output, session) {
       design_used = design,
       mode_used   = c_mode,
       power_used  = power,
-      theta0_used = theta0
+      theta0_used = theta0,
+      notes       = notes
     )
     
     if (identical(c_mode, "be_adapt")) {
@@ -566,41 +621,93 @@ server <- function(input, output, session) {
     tags$table(class = "table table-sm", tags$thead(hdr), tags$tbody(rows))
   }
   
+  ep_box <- function(ep, cv, meth, n){
+    tags$div(
+      class = "ep-card",
+      tags$div(
+        class = "ep-line",
+        sprintf("%s (CV %.2f)", ep, cv)
+      ),
+      tags$div(
+        class = "ep-line",
+        sprintf("%s: N =  %s", meth, n)
+      )
+    )
+  }
+  
+  build_endpoint_summary <- function(res, n1 = NULL){
+    m <- res$methods
+    core <- if (nrow(m) >= 2){
+      op <- if (m$N[1] < m$N[2]) "<" else if (m$N[1] > m$N[2]) ">" else "="
+      tags$div(class = "compare-center",
+               ep_box(m$Endpoint[1], m$CV[1], m$Method[1], m$N[1]),
+               tags$div(class = "op-bubble", op),
+               ep_box(m$Endpoint[2], m$CV[2], m$Method[2], m$N[2])
+      )
+    } else {
+      tags$div(class = "compare-center",
+               ep_box(m$Endpoint[1], m$CV[1], m$Method[1], m$N[1])
+      )
+    }
+    
+    if (identical(res$mode_used, "be_adapt") && !is.null(n1)) {
+      form <- tags$div(
+        class = "formula-row",
+        tags$span(class="formula-chip", paste0("Stage 1: ", n1)),
+        tags$span(class="op-bubble", "\u2794"),
+        tags$span(class="formula-chip", paste0("+ Additional: ", res$addon)),
+        tags$span(class="op-bubble", "="),
+        tags$span(class="formula-chip", paste0("Total: ", res$n_total))
+      )
+      tags$div(core, form)
+    } else {
+      core
+    }
+  }
+  
   make_results_ui <- function(res, design) {
     alloc_df <- alloc_table(res$n_total, design)
     cap <- if (identical(design, "parallel")) "Arm" else "Sequence"
-    method_pills <- lapply(seq_len(nrow(res$methods)), function(i) {
-      tags$span(
-        class = "metric",
-        paste0(res$methods$Endpoint[i], ": ", res$methods$Method[i])
-      )
-    })
+    
+    method_info <- build_endpoint_summary(res, n1 = input$n1)
+    
     metrics <- tags$div(
-      class = "metrics-bar",
-      tags$span(class = "metric", paste("Design:", design)),
-      tags$span(class = "metric", paste0("θ₀: ", res$theta0_used %||% input$theta0)),
-      tags$span(class = "metric",
-                paste0("Power: ", round((res$power_used %||% input$power) * 100), "%")),
-      if (!is.null(res$drop_used))
-        tags$span(class = "metric", paste0("Dropout: ", res$drop_used, "%")),
-      method_pills
+      class = "metrics-grid",
+      tags$div(
+        class = "metrics-stack",
+        tags$span(class = "metric", paste("Design:", design)),
+        tags$span(class = "metric", paste0("θ₀: ", res$theta0_used %||% input$theta0)),
+        tags$span(class = "metric",
+                  paste0("Power: ", round((res$power_used %||% input$power) * 100), "%")),
+        if (!is.null(res$drop_used))
+          tags$span(class = "metric", paste0("Dropout: ", res$drop_used, "%"))
+      ),
+      tags$div(class = "compare-cell", method_info)
     )
-    right_box <- bslib::value_box(
-      title = NULL,
-      showcase = bsicons::bs_icon("calculator"),
-      value = tags$div(
-        class = "valuebox-grid",
-        tags$div(
-          class = "valuebox-left",
-          tags$div(class = "totaln-label", "Total N"),
-          tags$div(class = "totaln-value", res$n_total)
-        ),
-        tags$div(
-          class = "mini-alloc",
-          table_tag(setNames(alloc_df, c(cap, "n")))
+    
+    right_box <- {
+      is_adapt <- identical(res$mode_used, "be_adapt")
+      lbl <- if (is_adapt) "To recruit" else "Total N"
+      val <- if (is_adapt) res$addon     else res$n_total
+      alloc_for_box <- if (is_adapt) alloc_table(val, design) else alloc_df
+      
+      bslib::value_box(
+        title = NULL,
+        showcase = bsicons::bs_icon("calculator"),
+        value = tags$div(
+          class = "valuebox-grid",
+          tags$div(
+            class = "valuebox-left",
+            tags$div(class = "totaln-label", lbl),
+            tags$div(class = "totaln-value", val)
+          ),
+          tags$div(
+            class = "mini-alloc",
+            table_tag(setNames(alloc_for_box, c(cap, "n")))
+          )
         )
       )
-    )
+    }
     layout_columns(col_widths = c(8, 4), metrics, right_box)
   }
   
@@ -612,7 +719,17 @@ server <- function(input, output, session) {
         style = "text-align:center; margin:2rem;"
       ))
     if (!is.null(r$error)) return(tags$pre(r$error))
-    make_results_ui(r, r$design_used)
+    ui <- make_results_ui(r, r$design_used)
+    
+    notes <- if (length(r$notes) > 0) {
+      div(
+        class = "results-notes",
+        tags$strong("Notes:"),
+        lapply(r$notes, function(x) HTML(x))
+      )
+    }
+    
+    tagList(ui, notes)
   })
   
   output$results_be       <- render_results_for("be")

@@ -1,8 +1,6 @@
 library(htmltools)
 
-preview_button <- function(theme) {
-  browsable(tags$body(bs_theme_dependencies(theme), button))
-}
+# Main -------------------------------------------------------------------------
 
 theme <- bs_theme(
   version = 5,
@@ -49,7 +47,7 @@ theme <- bslib::bs_add_rules(theme, "
 # Columns gap
 theme <- bslib::bs_add_rules(theme, "
   .cols-tight {
-    --tight-gap: 0.75rem;
+    --tight-gap: 1rem;
     gap: var(--tight-gap) !important;
   }
 ")
@@ -88,7 +86,9 @@ theme <- bslib::bs_add_rules(theme, "
   }
 ")
 
-# Copy icon
+# Details components -----------------------------------------------------------
+
+# Copy button & codebox
 theme <- bslib::bs_add_rules(theme, "
   .copy-btn {
     color: var(--bs-secondary);
@@ -100,15 +100,8 @@ theme <- bslib::bs_add_rules(theme, "
   }
   .copy-btn.copied {
     color: var(--bs-primary-text-emphasis);
-    opacity: .7;
   }
-  .copy-btn.copied:hover {
-    color: var(--bs-primary-text-emphasis);
-    opacity: 1;
-  }
-")
 
-theme <- bslib::bs_add_rules(theme, "
   .codebox {
     position: relative;
   }
@@ -117,16 +110,17 @@ theme <- bslib::bs_add_rules(theme, "
     top: .5rem;
     right: .5rem;
     padding: 0;
-    border: none;
+    border: 0;
     background: transparent;
   }
   .codebox .copy-btn .fa {
     font-size: 1rem;
   }
   .codebox pre {
-    padding-top: 2rem; /* чтобы кнопка не налезала на текст */
+    padding-top: 2rem; /* keep button from overlapping code */
   }
 ")
+
 
 copy_js <- "
 window.copyTextById = function(id, btnId){
@@ -166,7 +160,7 @@ window.showCopyFeedback = function(btnId){
 }
 "
 
-# ===================== Components  ============================================
+# Results Components -----------------------------------------------------------
 
 theme <- bslib::bs_add_rules(theme, "
   :root{
@@ -177,17 +171,12 @@ theme <- bslib::bs_add_rules(theme, "
     --ssp-pill-font-size: .85rem;
     --ssp-mini-alloc-font-size: .85rem;
   }
-
+  
   /* Metrics (pill) */
-  .metrics-bar{
-    display:flex;
-    gap:var(--ssp-gap);
-    flex-wrap:wrap;
-    align-items:center;
-  }
-  .metric{
+  .metric,
+  .formula-chip{
     border:1px solid var(--bs-border-color);
-    border-radius:var(--ssp-pill-radius);
+    border-radius:var(--bs-border-radius); /*--ssp-pill-radius*/
     padding:.25rem .6rem;
     background:var(--bs-body-bg);
     font-size:var(--ssp-pill-font-size);
@@ -242,6 +231,92 @@ theme <- bslib::bs_add_rules(theme, "
   }
 ")
 
+# Metrics layout: left pill stack + centered endpoint cards and formula
+theme <- bslib::bs_add_rules(theme, "
+  /* grid: left pills, right comparison area */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: clamp(120px, 22vw, 132px) minmax(0, 1fr);
+    gap: .75rem 1rem;
+    align-items: stretch;
+  }
+
+  /* left column: vertical pills, width fits content */
+  .metrics-stack {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+  }
+  .metrics-stack > .metric {
+    align-self: flex-start;
+    width: max-content;
+  }
+
+  /* right column: center vertically and horizontally */
+  .compare-cell {
+    align-self: center;
+  }
+  .compare-center {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+    margin-top: 0;
+  }
+
+  /* endpoint card */
+  .ep-card {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: .4rem .8rem;
+    min-height: 66px;
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+  }
+  .ep-line {
+    font-weight: 500;
+  }
+
+  /* operator bubble between endpoint cards */
+  .op-bubble {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    border-radius: var(--bs-border-radius);
+    font-weight: 600;
+  }
+
+  /* adaptive formula chips */
+  .formula-row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 1.5rem !important;
+    gap: .5rem;
+    justify-content: center;
+    align-items: center;
+    margin-top: .25rem;
+  }
+  
+  .results-notes {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    font-style: italic;
+    color: #555;
+  }
+  
+  @media (max-width: 768px) {
+    .metrics-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+")
+
 # /* Scrollable details log */
 # :root{ --ssp-pre-max-h: 320px;}
 # .pre-scroll{ max-height:var(--ssp-pre-max-h); overflow:auto; }
@@ -251,3 +326,5 @@ theme <- bslib::bs_add_rules(theme, "
 #   background:var(--bs-primary-bg-subtle);
 #   border-color:var(--bs-primary-border-subtle);
 # }
+
+

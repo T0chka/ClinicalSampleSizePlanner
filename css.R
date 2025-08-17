@@ -36,6 +36,14 @@ theme <- bslib::bs_add_rules(theme, "
   }
 ")
 
+# Bottom spacing for content (but not header)
+theme <- bslib::bs_add_rules(theme, "
+  /* Apply bottom spacing only to the main content container (after navbar) */
+  .bslib-page-navbar > .navbar + .container-fluid {
+    padding-bottom: 2rem;
+  }
+")
+
 # Sidebar card header padding
 theme <- bslib::bs_add_rules(theme, "
   .sidebar-card .card-header {
@@ -75,7 +83,10 @@ theme <- bslib::bs_add_rules(theme, "
 theme <- bslib::bs_add_rules(theme, "
   body { padding-bottom: 48px; }
   .app-footer {
-    position: fixed; left: 0; right: 0; bottom: 0;
+    position: fixed; 
+    left: 0; 
+    right: 0; 
+    bottom: 0;
     background: var(--bs-body-bg);
     padding-top: 0.5rem !important;
     padding-bottom: 0.5rem !important;
@@ -83,6 +94,10 @@ theme <- bslib::bs_add_rules(theme, "
     text-align: center;
     font-size: 0.85rem;
     color: #6c757d;
+    z-index: 1030;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 ")
 
@@ -104,6 +119,9 @@ theme <- bslib::bs_add_rules(theme, "
 
   .codebox {
     position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
   }
   .codebox .copy-btn {
     position: absolute;
@@ -118,6 +136,28 @@ theme <- bslib::bs_add_rules(theme, "
   }
   .codebox pre {
     padding-top: 2rem; /* keep button from overlapping code */
+    flex: 1;
+    margin-bottom: 0;
+    min-height: 300px;
+  }
+  
+  /* Ensure columns have equal height for details */
+  .details-columns {
+    display: flex;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  .details-columns > div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* Stack details columns on mobile */
+  @media (max-width: 768px) {
+    .details-columns {
+      flex-direction: column;
+    }
   }
 ")
 

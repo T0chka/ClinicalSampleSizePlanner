@@ -729,7 +729,7 @@ server <- function(input, output, session) {
       notes <- if (length(r$notes) > 0) {
         div(
           class = "results-notes",
-          tags$strong("Notes:"),
+          tags$strong("Note:"),
           lapply(r$notes, function(x) HTML(x))
         )
       }
@@ -750,8 +750,8 @@ server <- function(input, output, session) {
     ))
 
     if (length(r$details) == 2) {
-      layout_columns(
-        col_widths = c(6, 6),
+      div(
+        class = "details-columns",
         div(
           tags$strong("AUC"),
           div(

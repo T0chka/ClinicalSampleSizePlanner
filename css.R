@@ -54,9 +54,18 @@ theme <- bslib::bs_add_rules(theme, "
 
 # Columns gap
 theme <- bslib::bs_add_rules(theme, "
+  /* Column gap */
   .layout-columns {
     --tight-gap: 1rem;
     gap: var(--tight-gap) !important;
+  }
+  /* Remove row gap (between panels) */
+  .bslib-gap-spacing{
+    row-gap: 0 !important;
+  }
+  /* Remove top padding (below main navigation) */
+  .html-fill-container>.html-fill-item.bslib-mb-spacing {
+      margin-top: 0 !important;
   }
 ")
 
@@ -92,7 +101,7 @@ theme <- bslib::bs_add_rules(theme, "
     padding-bottom: 0.5rem !important;
     border-top: 1px solid var(--bs-border-color);
     text-align: center;
-    font-size: 0.85rem;
+    font-size: 0.70rem;
     color: #6c757d;
     z-index: 1030;
     display: flex;

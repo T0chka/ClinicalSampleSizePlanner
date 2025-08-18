@@ -225,8 +225,8 @@ server <- function(input, output, session) {
     design_labels <- c(
       parallel = "parallel",
       "2x2"    = "2×2",
-      "2x2x3"  = "2×2×3",
       "2x3x3"  = "2×3×3",
+      "2x2x3"  = "2×2×3",
       "2x2x4"  = "2×2×4"
     )
     setNames(keys, design_labels[keys])
@@ -273,26 +273,66 @@ server <- function(input, output, session) {
 
   output$ui_design <- renderUI({
     ntid     <- identical(input$ntid, "yes")
-    adaptive <- identical(mode(), "be_adapt")
+    is_be    <- identical(mode(), "be")
+    is_adapt <- identical(mode(), "be_adapt")
+    
+    select   <- if (is_adapt) "2x2" else "parallel"
+    
+    if (is_be) {
+      basic <- c("parallel", "2x2")
+      repl  <- if (ntid) c("2x2x4") else c("2x3x3", "2x2x3", "2x2x4")
+      
+      rb <- radioButtons(
+        inputId = "design", label = "Design",
+        choices = setNames(character(0), character(0)),
+        selected = select
+      )
+      
+      rb |>
+        tagAppendChildren(
+          div(
+            style = "display:flex; gap:1.5rem;",
+            div(
+              style = "display:flex; flex-direction:column; width:40%;",
+              lapply(
+                basic,
+                function(x) tags$label(
+                  class = "radio",
+                  tags$input(
+                    type = "radio", name = "design", value = x,
+                    checked = if (x == select) TRUE else NULL
+                  ),
+                  labelize(x)[[1]]
+                )
+              )
+            ),
+            div(
+              style = "display:flex; flex-direction:column; width:60%;",
+              lapply(
+                repl,
+                function(x) tags$label(
+                  class = "radio",
+                  tags$input(
+                    type = "radio", name = "design", value = x
+                  ),
+                  labelize(x)[[1]]
+                )
+              )
+            )
+          )
+        )
+    } else {
+      choices <- if (is_adapt) "2x2" else c("parallel", "2x2")
 
-    choices <- switch(
-      mode(),
-      "be" = 
-        if (ntid)  c("parallel", "2x2", "2x2x4")
-        else       c("parallel", "2x2", "2x2x3", "2x3x3", "2x2x4"),
-      "ni" =       c("parallel", "2x2"),
-      "ns" =       c("parallel", "2x2"),
-      "be_adapt" = c("2x2"),
-      c("parallel", "2x2") # fallback
-    )
-    radioButtons(
-      inputId  = "design",
-      label    = "Design",
-      choices  = labelize(choices),
-      selected = if (adaptive) "2x2" else "parallel"
-    )
+      radioButtons(
+        inputId  = "design",
+        label    = "Design",
+        choices  = labelize(choices),
+        selected = select
+      )
+    }
   })
-
+  
   observe({
     is_parallel <- identical(input$design, "parallel")
     is_repl     <- is_replicative(input$design)
@@ -319,9 +359,9 @@ server <- function(input, output, session) {
     lab_be <- if (ntidr) "AUC T/R (θ₀) (using 0.975 for Cmax)" else "T/R (θ₀)"
     switch(
       mode(),
-      ns = numericInput("theta0", "T/R (θ₀)", 1.05, 1.05, 1.05, 0.01),
-      ni = numericInput("theta0", "T/R (θ₀)", 0.95, 0.95, 0.95, 0.01),
-      numericInput(     "theta0", lab_be,     0.95, 0.90, 0.95, 0.01)
+      ns = numericInput("theta0", "T/R (θ₀)", 1.05, 1.05, 1.05, 0.01, width = "100%"),
+      ni = numericInput("theta0", "T/R (θ₀)", 0.95, 0.95, 0.95, 0.01, width = "100%"),
+      numericInput(     "theta0", lab_be,     0.95, 0.90, 0.95, 0.01, width = "100%")
     )
   })
 
@@ -331,7 +371,7 @@ server <- function(input, output, session) {
       inputId = "power",
       label   = "Power",
       value   = val, min = 0.80, max = 0.95, step = 0.05,
-      ticks   = TRUE
+      ticks   = TRUE, width = "100%" 
     )
   })
 

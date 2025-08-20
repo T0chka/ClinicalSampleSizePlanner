@@ -200,7 +200,13 @@ ui <- page_navbar(
   ),
   footer = div(
     class = "app-footer",
-    "Version 1.0 | © 2025 Antonina Dolgorukova"
+    "Version 1.0 | © 2025 Antonina Dolgorukova | ",
+    tags$a(
+      href = "https://github.com/T0chka/ClinicalSampleSizePlanner",
+      target = "_blank",
+      bsicons::bs_icon("github"),
+      style = "color: inherit; text-decoration: none; margin-left: 0.5rem;"
+    )
   )
 )
 
@@ -847,7 +853,7 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui, server)
-# 
+
 # rsconnect::deployApp(
 #   appFiles = c("app.R", "css.R", "renv.lock", "README.md", "LICENSE")
 # )

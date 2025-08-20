@@ -1,6 +1,6 @@
 library(htmltools)
 
-# Main -------------------------------------------------------------------------
+# Theme Configuration ----------------------------------------------------------
 
 theme <- bs_theme(
   version = 5,
@@ -11,7 +11,9 @@ theme <- bs_theme(
   heading_font = font_google("Inter")
 )
 
-# Title and subtitle
+# Navigation -------------------------------------------------------------------
+
+# Navbar brand styling (Title and subtitle)
 theme <- bslib::bs_add_rules(theme, "
   .navbar .navbar-brand { margin: 0 !important; }
   .navbar .navbar-brand .name-title   { font-size: 2rem; }
@@ -28,6 +30,20 @@ theme <- bslib::bs_add_rules(theme, "
   }
 ")
 
+# Card header styling
+theme <- bslib::bs_add_rules(theme, "
+  .card-header {
+    background-color: var(--bs-primary-bg-subtle);
+    color: var(--bs-primary-text-emphasis);
+  }
+  .sidebar-card .card-header {
+    padding-top: 1rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+")
+
+# Layout & Spacing -------------------------------------------------------------
+
 # Remove side and bottom borders for the top-level navset card
 theme <- bslib::bs_add_rules(theme, "
   .html-fill-container {
@@ -36,7 +52,7 @@ theme <- bslib::bs_add_rules(theme, "
   }
 ")
 
-# Bottom spacing for content (but not header)
+# Bottom spacing for content
 theme <- bslib::bs_add_rules(theme, "
   /* Apply bottom spacing only to the main content container (after navbar) */
   .bslib-page-navbar > .navbar + .container-fluid {
@@ -44,15 +60,7 @@ theme <- bslib::bs_add_rules(theme, "
   }
 ")
 
-# Sidebar card header padding
-theme <- bslib::bs_add_rules(theme, "
-  .sidebar-card .card-header {
-    padding-top: 1rem !important;
-    padding-bottom: 0.5rem !important;
-  }
-")
-
-# Columns gap
+# Column layout
 theme <- bslib::bs_add_rules(theme, "
   /* Column gap */
   .layout-columns {
@@ -69,13 +77,7 @@ theme <- bslib::bs_add_rules(theme, "
   }
 ")
 
-# Match card-header style to accordion-button
-theme <- bslib::bs_add_rules(theme, "
-  .card-header {
-    background-color: var(--bs-primary-bg-subtle);
-    color: var(--bs-primary-text-emphasis);
-  }
-")
+# Accordion --------------------------------------------------------------------
 
 # Accordion: remove extra borders/shadows
 theme <- bslib::bs_add_rules(theme, "
@@ -88,7 +90,8 @@ theme <- bslib::bs_add_rules(theme, "
   }
 ")
 
-# Footer
+# Footer -----------------------------------------------------------------------
+
 theme <- bslib::bs_add_rules(theme, "
   body { padding-bottom: 48px; }
   .app-footer {
@@ -110,7 +113,7 @@ theme <- bslib::bs_add_rules(theme, "
   }
 ")
 
-# Details components -----------------------------------------------------------
+# Details section components ---------------------------------------------------
 
 # Copy button & codebox
 theme <- bslib::bs_add_rules(theme, "
@@ -131,6 +134,7 @@ theme <- bslib::bs_add_rules(theme, "
     display: flex;
     flex-direction: column;
     height: 100%;
+    font-size: 14px;
   }
   .codebox .copy-btn {
     position: absolute;
@@ -161,53 +165,8 @@ theme <- bslib::bs_add_rules(theme, "
     display: flex;
     flex-direction: column;
   }
-  
-  /* Stack details columns on mobile */
-  @media (max-width: 768px) {
-    .details-columns {
-      flex-direction: column;
-    }
-  }
 ")
 
-
-copy_js <- "
-window.copyResultsToClipboard = function(id, btnId){
-  const el = document.getElementById(id);
-  if(!el) return;
-  const txt = el.textContent || '';
-  if(navigator.clipboard && window.isSecureContext){
-    navigator.clipboard.writeText(txt).then(function(){
-      window.showCopySuccessIndicator(btnId);
-    }).catch(function(err){
-      console.error('Clipboard write failed', err);
-    });
-  } else {
-    const ta = document.createElement('textarea');
-    ta.value = txt;
-    document.body.appendChild(ta);
-    ta.focus(); ta.select();
-    try {
-      document.execCommand('copy');
-      window.showCopySuccessIndicator(btnId);
-    } catch (err) { console.error(err); }
-    document.body.removeChild(ta);
-  }
-}
-
-window.showCopySuccessIndicator = function(btnId){
-  const btn = document.getElementById(btnId);
-  if(!btn) return;
-  const icon = btn.querySelector('i');
-  if(!icon) return;
-  icon.className = 'fa fa-clipboard-check';
-  btn.classList.add('copied');
-  setTimeout(function(){
-    icon.className = 'fa fa-copy';
-    btn.classList.remove('copied');
-  }, 1000);
-}
-"
 
 # Results Components -----------------------------------------------------------
 
@@ -244,8 +203,7 @@ theme <- bslib::bs_add_rules(theme, "
   .valuebox-grid{
     display:grid;
     grid-template-columns: 1fr 1fr;
-    gap:.5rem 1rem;
-    column-gap: .5rem;
+    gap: .5rem 1rem;
     align-items: center;
   }
   .sample-size-label{
@@ -270,11 +228,6 @@ theme <- bslib::bs_add_rules(theme, "
   .mini-alloc-table .table > :not(caption) > * > th:last-child,
   .mini-alloc-table .table > :not(caption) > * > td:last-child{
     text-align: center !important;
-  }
-  
-  /* stack TotalN grid on narrow screens */
-  @media (max-width: 576px){
-    .valuebox-grid{ grid-template-columns: 1fr; }
   }
 ")
 
@@ -343,11 +296,10 @@ theme <- bslib::bs_add_rules(theme, "
   .formula-row {
     display: flex;
     flex-wrap: wrap;
-    margin-top: 1.5rem !important;
     gap: .5rem;
     justify-content: center;
     align-items: center;
-    margin-top: .25rem;
+    margin-top: 1.5rem !important;
   }
   
   .results-notes {
@@ -356,22 +308,64 @@ theme <- bslib::bs_add_rules(theme, "
     font-style: italic;
     color: #555;
   }
-  
+
+")
+
+# Media Queries ----------------------------------------------------------------
+
+theme <- bslib::bs_add_rules(theme, "
+  /* Stack details columns on mobile */
   @media (max-width: 768px) {
+    .details-columns {
+      flex-direction: column;
+    }
     .methods-grid {
       grid-template-columns: 1fr;
     }
   }
+  
+  /* Stack TotalN grid on narrow screens */
+  @media (max-width: 576px){
+    .valuebox-grid{ grid-template-columns: 1fr; }
+  }
 ")
 
-# /* Scrollable details log */
-# :root{ --ssp-pre-max-h: 320px;}
-# .pre-scroll{ max-height:var(--ssp-pre-max-h); overflow:auto; }
+# JavaScript -------------------------------------------------------------------
 
-# /* Emphasize metrics */
-# .metric-strong{
-#   background:var(--bs-primary-bg-subtle);
-#   border-color:var(--bs-primary-border-subtle);
-# }
+copy_js <- "
+window.copyResultsToClipboard = function(id, btnId){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const txt = el.textContent || '';
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(txt).then(function(){
+      window.showCopySuccessIndicator(btnId);
+    }).catch(function(err){
+      console.error('Clipboard write failed', err);
+    });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try {
+      document.execCommand('copy');
+      window.showCopySuccessIndicator(btnId);
+    } catch (err) { console.error(err); }
+    document.body.removeChild(ta);
+  }
+}
 
-
+window.showCopySuccessIndicator = function(btnId){
+  const btn = document.getElementById(btnId);
+  if(!btn) return;
+  const icon = btn.querySelector('i');
+  if(!icon) return;
+  icon.className = 'fa fa-clipboard-check';
+  btn.classList.add('copied');
+  setTimeout(function(){
+    icon.className = 'fa fa-copy';
+    btn.classList.remove('copied');
+  }, 1000);
+}
+"

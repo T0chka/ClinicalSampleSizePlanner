@@ -107,7 +107,7 @@ ui <- page_navbar(
                   uiOutput("results_be")
                 ),
                 nav_panel(
-                  title = "Adaptive (Potvin B)",
+                  title = "Adaptive (Stage 2)",
                   value = "be_adapt",
                   uiOutput("results_be_adapt")
                 ),
@@ -366,7 +366,7 @@ server <- function(input, output, session) {
       numericInput(
         inputId = "drop",
         label   = "Dropout, %",
-        value   = 0, min = 0, max = 100, step = 1,
+        value   = 6, min = 0, max = 100, step = 1,
         width   = "100%"
       )
     } else {
@@ -480,7 +480,8 @@ server <- function(input, output, session) {
     list(n = extract_n(r), txt = txt, method = meth)
   }
 
-  add_be_notes <- function(notes, is_repl, is_ntid, cv_cmax, use_scABEL) {
+  add_be_notes <- function(notes, is_repl, is_ntid, cv_cmax, use_scABEL, mode, n_total) {
+    # Highly variable Cmax note
     if (!is_repl && cv_cmax > 0.30 && !is_ntid) {
       notes <- c(
         notes,
@@ -493,6 +494,7 @@ server <- function(input, output, session) {
       )
     }
 
+    # scABEL note
     if (use_scABEL) {
       notes <- c(
         notes,
@@ -506,6 +508,7 @@ server <- function(input, output, session) {
       )
     }
 
+    # NTID note
     if (is_ntid && is_repl) {
       notes <- c(
         notes,
@@ -516,6 +519,27 @@ server <- function(input, output, session) {
           "documents' target='_blank'>FDA</a> also requires passing unscaled ABE ",
           "(80.00–125.00%) and that the upper limit of the 90% confidence interval ",
           "for \u03c3wT/\u03c3wR \u2264 2.5."
+        )
+      )
+    }
+    # Adaptive design note
+    if (identical(mode, "be_adapt")) {
+      notes <- c(
+        notes,
+        paste0(
+          "Stage 2 sample size is based on adjusted α = 0.0294 (Potvin B/C) ",
+          "and assumes the user-supplied CV corresponds to the stage-1 estimate."
+        )
+      )
+    }
+
+    # Minimum sample size note
+    if (!is.null(n_total) && n_total < 12) {
+      notes <- c(
+        notes,
+        paste0(
+          "Calculated sample size (n = ", n_total, ") is below the regulatory ",
+          "minimum of 12 subjects required by EMA and FDA for bioequivalence studies."
         )
       )
     }
@@ -592,7 +616,7 @@ server <- function(input, output, session) {
         N        = c(auc$n, cmax$n)
       )
       details <- list(auc = auc$txt, cmax = cmax$txt)
-      notes <- add_be_notes(notes, is_repl, is_ntid, cv_cmax, use_scABEL)
+      notes <- add_be_notes(notes, is_repl, is_ntid, cv_cmax, use_scABEL, c_mode, n_total)
     }
 
     out <- list(
@@ -823,3 +847,7 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui, server)
+# 
+# rsconnect::deployApp(
+#   appFiles = c("app.R", "css.R", "renv.lock", "README.md", "LICENSE")
+# )

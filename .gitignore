@@ -46,8 +46,10 @@ draft.R
 # translation temp files
 po/*~
 
-# RStudio Connect folder
+# RStudio Connect
 rsconnect/
+.rscignore
+renv.lock
 
 # other
 materials/

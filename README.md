@@ -2,6 +2,8 @@
 
 A Shiny application for sample size planning in clinical trials. Provides regulator-friendly designs with statistical power calculations for bioequivalence studies and early phase clinical trials (work in progress).
 
+**Live Application:** https://andolgorukova.shinyapps.io/ClinicalSampleSizePlanner/
+
 ## Features
 
 **Bioequivalence Studies**

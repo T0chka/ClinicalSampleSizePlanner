@@ -8,7 +8,7 @@ library(PowerTOST)
 source("css.R")
 `%||%` <- function(a, b) if (!is.null(a)) a else b
 
-# UI ---------------------------------------------------------------------------
+# --- UI -----------------------------------------------------------------------
 
 ui <- page_navbar(
   theme = theme,
@@ -30,7 +30,7 @@ ui <- page_navbar(
     navset_card_tab(
       id = "main_navigation",
 
-      # --- Bioequivalence -----
+      # --- Bioequivalence -----------------------------------------------------
 
       nav_panel(
         title = "Bioequivalence",
@@ -137,7 +137,7 @@ ui <- page_navbar(
         )
       ),
 
-      # --- Phase I -----
+      # --- Phase I ------------------------------------------------------------
 
       nav_panel(
         title = "Phase I",
@@ -195,20 +195,6 @@ ui <- page_navbar(
             )
           )
         )
-      ),
-
-      # --- About -----
-
-      nav_panel(
-        title = "About",
-        value = "about",
-        layout_columns(
-          col_widths = c(12),
-          class = "layout-columns mt-3",
-          div(
-            p("Sample size planning toolkit.")
-          )
-        )
       )
     )
   ),
@@ -234,7 +220,7 @@ server <- function(input, output, session) {
   is_replicative <- function(d) isTRUE(d %in% c("2x2x3", "2x3x3", "2x2x4"))
   mode           <- reactive(input$be_mode %||% "be")
 
-  # --- Settings renderUI -----
+  # --- Settings renderUI ------------------------------------------------------
 
   # Endpoint selection only for NI/NS per spec; hidden for BE
   output$ui_mode_specific <- renderUI({
@@ -380,7 +366,7 @@ server <- function(input, output, session) {
       numericInput(
         inputId = "drop",
         label   = "Dropout, %",
-        value   = 10, min = 0, max = 100, step = 1,
+        value   = 0, min = 0, max = 100, step = 1,
         width   = "100%"
       )
     } else {
@@ -388,7 +374,7 @@ server <- function(input, output, session) {
     }
   })
 
-  # --- Calculate / Reset button -----
+  # --- Calculate / Reset button -----------------------------------------------
 
   calc_results <- reactiveVal(NULL)
 
@@ -511,7 +497,8 @@ server <- function(input, output, session) {
       notes <- c(
         notes,
         paste0(
-          "Sample size is based on scABEL (scaled limits). ",
+          "Cmax sample size is based on scABEL (scaled limits). ",
+          "If this endpoint determines the final sample size, note that ",
           "<a href='https://www.ema.europa.eu/en/investigation-bioequivalence-",
           "scientific-guideline' target='_blank'>EMA</a> also requires the point ",
           "estimate (GMR) to lie within [0.80; 1.25]."
@@ -523,7 +510,8 @@ server <- function(input, output, session) {
       notes <- c(
         notes,
         paste0(
-          "Sample size is based on RSABE with fixed parameters. ",
+          "Cmax sample size is based on RSABE with fixed parameters. ",
+          "If this endpoint determines the final sample size, note that ",
           "<a href='https://www.fda.gov/regulatory-information/search-fda-guidance-",
           "documents' target='_blank'>FDA</a> also requires passing unscaled ABE ",
           "(80.00–125.00%) and that the upper limit of the 90% confidence interval ",

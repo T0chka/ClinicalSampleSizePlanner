@@ -214,8 +214,17 @@ theme <- bslib::bs_add_rules(theme, "
     margin-bottom:.1rem;
   }
   .sample-size-value{
+    display: inline-block;
     font-size:var(--sample-size-value-font-size);
     font-weight:500;
+  }
+  
+  .tooltip.n-tooltip .tooltip-inner {
+    max-width: 560px !important;
+    padding: 10px 12px;
+    background: #1f2937;
+    font-size: 0.8rem;
+    color: #fff;
   }
 
   /* Mini allocation table */

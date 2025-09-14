@@ -8,6 +8,8 @@ library(PowerTOST)
 source("css.R")
 `%||%` <- function(a, b) if (!is.null(a)) a else b
 
+MIN_SS <- 12L
+
 # --- UI -----------------------------------------------------------------------
 
 ui <- page_navbar(
@@ -218,13 +220,13 @@ server <- function(input, output, session) {
       parallel = "parallel",
       "2x2"    = "2×2",
       "2x3x3"  = "2×3×3",
-      "2x2x3"  = "2×2×3",
       "2x2x4"  = "2×2×4"
     )
     setNames(keys, design_labels[keys])
   }
   is_replicative <- function(d) isTRUE(d %in% c("2x2x3", "2x3x3", "2x2x4"))
   mode           <- reactive(input$be_mode %||% "be")
+  ntid_active    <- reactive(identical(mode(), "be") && identical(input$ntid, "yes"))
 
   # --- Settings renderUI ------------------------------------------------------
 
@@ -272,7 +274,7 @@ server <- function(input, output, session) {
     
     if (is_be) {
       basic <- c("parallel", "2x2")
-      repl  <- if (ntid) c("2x2x4") else c("2x3x3", "2x2x3", "2x2x4")
+      repl  <- if (ntid) c("2x2x4") else c("2x3x3", "2x2x4")
       
       rb <- radioButtons(
         inputId = "design", label = "Design",
@@ -394,7 +396,7 @@ server <- function(input, output, session) {
   })
 
   # change tabs BE/p1/p2/about
-  observeEvent(input$module, {
+  observeEvent(input$main_navigation, {
     calc_results(NULL)
   }, ignoreInit = TRUE)
 
@@ -545,17 +547,57 @@ server <- function(input, output, session) {
         notes,
         paste0(
           "Calculated sample size (n = ", n_total, ") is below the regulatory ",
-          "minimum of 12 subjects required by EMA and FDA for bioequivalence studies."
+          "minimum of 12 subjects required by EMA/FDA for bioequivalence studies. ",
+          "Set to 12 for TOTAL N calculation."
         )
       )
     }
 
     notes
   }
+  
+  .adjust_n_for_design <- function(n, n_arms) {
+    remainder <- n %% n_arms
+    if (remainder == 0L) n else n + (n_arms - remainder)
+  }
+  .apply_dropout <- function(n, drop) {
+    ceiling(n / (1 - drop/100))
+  }
+  
+  compute_n_total <- function(n_raw, min_ss, drop, design) {
+    steps <- character()
+    n     <- n_raw
+    
+    # adjust for regulatory minimum
+    if (n < min_ss) {
+      n     <- min_ss
+      steps <- c(steps, paste0("Regulatory minimum: ", min_ss))
+    }
+    
+    # adjust for dropout
+    if (!is.null(drop) && drop > 0) {
+      n     <- .apply_dropout(n, drop)
+      steps <- c(steps, sprintf("Dropout adjustment (%d%%): %d", drop, n))
+    }
+    
+    # adjust for equal numbers in arms
+    n_arms  <-  arms_count(design)
+    n_total <- .adjust_n_for_design(n, n_arms)
+    
+    if (n_total != n) {
+      steps <- c(steps, paste0("Allocation adjustment: ", n_total))
+    }
+    
+    if (n_total != n_raw) {
+      steps <- c(paste0("Base: ", n_raw), steps)
+    }
+    
+    list(n_total = n_total, derivation = steps)
+  }
 
   compute_result <- function() {
     c_mode    <- mode()
-    is_ntid   <- identical(input$ntid, "yes")
+    is_ntid   <- ntid_active()
     design    <- input$design
     power     <- input$power
     cv_auc    <- input$cv_auc
@@ -563,7 +605,8 @@ server <- function(input, output, session) {
     cv_single <- input$cv_single
     theta0    <- input$theta0
     dropout   <- input$drop
-
+    
+    active_dropout <- if (identical(c_mode, "be_adapt")) NULL else dropout
     margin  <- if (identical(c_mode, "ni")) 0.80 else 1.25
     theta1  <- if (is_ntid) 0.90 else 0.80
     alpha  <- switch(
@@ -578,7 +621,7 @@ server <- function(input, output, session) {
     if (identical(c_mode, "ni") || identical(c_mode, "ns")) {
       endp <- input$endp
       res  <- run_noninf(alpha, CV = cv_single, design, power, theta0, margin)
-      n_total <- res$n
+      n_raw <- res$n
       methods <- data.frame(
         Endpoint = endp,
         Method   = res$method,
@@ -614,7 +657,7 @@ server <- function(input, output, session) {
       )
       cmax <- do.call(cmax_fn, cmax_args)
 
-      n_total <- max(auc$n, cmax$n, na.rm = TRUE)
+      n_raw <- max(auc$n, cmax$n, na.rm = TRUE)
       methods <- data.frame(
         Endpoint = c("AUC", "Cmax"),
         Method   = c(auc$method, cmax$method),
@@ -622,27 +665,27 @@ server <- function(input, output, session) {
         N        = c(auc$n, cmax$n)
       )
       details <- list(auc = auc$txt, cmax = cmax$txt)
-      notes <- add_be_notes(notes, is_repl, is_ntid, cv_cmax, use_scABEL, c_mode, n_total)
+      notes <- add_be_notes(notes, is_repl, is_ntid, cv_cmax, use_scABEL, c_mode, n_raw)
     }
-
+    
+    # adjust n_total
+    total_calc <- compute_n_total(n_raw, MIN_SS, active_dropout, design)
+    
     out <- list(
-      n_total     = n_total,
+      n_total     = total_calc$n_total,
       methods     = methods,
       details     = details,
       design_used = design,
       mode_used   = c_mode,
       power_used  = power,
       theta0_used = theta0,
-      notes       = notes
+      drop_used   = active_dropout,
+      notes       = notes,
+      derivation  = total_calc$derivation
     )
-
+    
     if (identical(c_mode, "be_adapt")) {
       out$addon <- max(0L, out$n_total - (input$n1))
-    } else {
-      if (!is.null(dropout) && dropout > 0) {
-        out$n_total <- ceiling(out$n_total / (1 - dropout/100))
-        out$drop_used   = dropout
-      }
     }
 
     return(out)
@@ -653,10 +696,15 @@ server <- function(input, output, session) {
   seq_map <- list(
     parallel = c("T", "R"),
     "2x2"    = c("TR", "RT"),
-    "2x2x3"  = c("TRR", "RTR"),
     "2x3x3"  = c("TRR", "RTR", "RRT"),
     "2x2x4"  = c("TRTR", "RTRT")
   )
+  
+  arms_count <- function(design) {
+    sequences <- seq_map[[design]]
+    if (is.null(sequences)) stop("Unknown design: ", design)
+    length(sequences)
+  }
 
   alloc_table <- function(n_total, design) {
     s <- seq_map[[design]] %||% c("T", "R")
@@ -753,6 +801,32 @@ server <- function(input, output, session) {
       val      <- if (is_adapt) res$addon    else res$n_total
       alloc_for_box <- alloc_table(val, design)
 
+      value_num <- tags$span(class = "sample-size-value tip-target", val)
+      if (length(res$derivation) > 0) {
+        lines <- res$derivation
+        deriv_html <- tags$div(
+          class = "n-deriv",
+          lapply(seq_along(lines), function(i) {
+            list(
+              tags$div(
+                class = "deriv-line",
+                HTML(gsub("^([^:]+):\\s*", "<span class='deriv-label'>\\1:</span> ", lines[i]))
+              ),
+              if (i < length(lines)) tags$div(class = "deriv-arrow", HTML("&#8595;"))
+            )
+          })
+        )
+        value_num <- bslib::tooltip(
+          value_num,
+          deriv_html,
+          placement = "top",
+          options = list(
+            customClass = "n-tooltip",
+            offset = c(10, 25)
+          )
+        )
+      }
+      
       bslib::value_box(
         title = NULL,
         showcase = bsicons::bs_icon("calculator"),
@@ -761,7 +835,7 @@ server <- function(input, output, session) {
           tags$div(
             class = "valuebox-left",
             tags$div(class = "sample-size-label", lbl),
-            tags$div(class = "sample-size-value", val)
+            value_num
           ),
           tags$div(
             class = "mini-alloc-table",
